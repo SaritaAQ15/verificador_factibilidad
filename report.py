@@ -2,12 +2,12 @@
 Generador de Reportes de Evaluación y Diagnóstico
 ------------------------------------------------------------
 Transforma el objeto ResultadoValidacion en reportes legibles en consola
-(con formato estructurado) y en diccionarios serializables a JSON para
-evaluación automatizada o exportación.
+(con tablas estructuradas y formato claro) y en diccionarios serializables
+a JSON para evaluación automatizada o exportación.
 """
 
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from models import ResultadoValidacion, MetricasRuta, CONFIG
 from loader import DatasetSitios
 
@@ -28,95 +28,140 @@ def generar_reporte_consola(
     titulo: str = "REPORTE DE EVALUACIÓN - FACTIBILIDAD Y RENDIMIENTO"
 ) -> str:
     """
-    Genera un reporte en texto con formato visual y tablas para terminal.
+    Genera un reporte estructurado y de alta legibilidad en consola o notebooks.
     """
-    ancho = 80
-    linea_doble = "=" * ancho
-    linea_simple = "-" * ancho
+    ancho = 86
+    lineas: List[str] = []
 
-    lineas = []
-    lineas.append(linea_doble)
-    lineas.append(f"{titulo.center(ancho)}")
-    lineas.append(linea_doble)
+    # Encabezado principal
+    lineas.append("╔" + "═" * (ancho - 2) + "╗")
+    lineas.append(f"║{titulo.center(ancho - 2)}║")
+    lineas.append("╚" + "═" * (ancho - 2) + "╝")
 
-    # 1. ESTADO DE FACTIBILIDAD
+    # 1. Estado de factibilidad
     if resultado.es_factible:
-        estado_badge = "[ FACTIBLE - SOLUCIÓN VÁLIDA ]"
+        estado_badge = " ✔ FACTIBLE (SOLUCIÓN VÁLIDA) "
     else:
-        estado_badge = "[ NO FACTIBLE - SOLUCIÓN RECHAZADA ]"
-    
-    lineas.append(f"ESTADO GENERAL : {estado_badge}")
-    lineas.append(linea_simple)
+        estado_badge = " ✖ NO FACTIBLE (SOLUCIÓN RECHAZADA) "
 
-    # 2. ERRORES Y ADVERTENCIAS
+    lineas.append(f"\n[ ESTADO GENERAL ]: {estado_badge}")
+    lineas.append("─" * ancho)
+
+    # 2. Errores detectados
     if resultado.errores_globales:
-        lineas.append("ERRORES DETECTADOS (RESTRICCIONES VIOLADAS):")
+        lineas.append("✖ RESTRICCIONES VIOLADAS:")
         for idx, err in enumerate(resultado.errores_globales, start=1):
-            lineas.append(f"  [{idx}] {err}")
-        lineas.append(linea_simple)
+            lineas.append(f"  [{idx:02d}] {err}")
+        lineas.append("─" * ancho)
 
+    # 3. Advertencias
     if resultado.advertencias:
-        lineas.append("ADVERTENCIAS:")
+        lineas.append("⚠ ADVERTENCIAS / NORMALIZACIONES:")
         for idx, adv in enumerate(resultado.advertencias, start=1):
-            lineas.append(f"  (*) {adv}")
-        lineas.append(linea_simple)
+            lineas.append(f"  * {adv}")
+        lineas.append("─" * ancho)
 
-    # 3. TABLA RESUMEN POR VAN
+    # 4. Tabla de métricas por van
     if resultado.metricas_por_van:
-        lineas.append("DESGLOSE OPERACIONAL POR VEHÍCULO:")
-        encabezado = f"{'Van':<8} | {'Sitios':<8} | {'Distancia':<12} | {'T. Traslado':<12} | {'T. Total':<14} | {'Satisfacción':<12}"
-        lineas.append(encabezado)
-        lineas.append("-" * len(encabezado))
+        lineas.append("📊 DESGLOSE OPERACIONAL POR VEHÍCULO:\n")
+        lineas.append("┌──────────┬────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┐")
+        lineas.append("│ Van      │ Sitios │ Distancia   │ T. Traslado │ T. Estancia │ T. Total    │ Satisfacción │")
+        lineas.append("├──────────┼────────┼─────────────┼─────────────┼─────────────┼─────────────┼──────────────┤")
+
+        tot_sitios = 0
+        tot_dist = 0.0
+        tot_t_traslado = 0.0
+        tot_t_estancia = 0.0
+        tot_pts = 0
 
         for van_id, m in resultado.metricas_por_van.items():
-            t_total_str = f"{m.tiempo_total_horas:.2f} h"
-            fila = (
-                f"{van_id:<8} | "
-                f"{m.num_sitios:<8} | "
-                f"{m.distancia_total_km:>8.2f} km | "
-                f"{m.tiempo_traslado_horas:>8.2f} h | "
-                f"{t_total_str:>10} | "
-                f"{m.puntaje_acumulado:>8} pts"
+            tot_sitios += m.num_sitios
+            tot_dist += m.distancia_total_km
+            tot_t_traslado += m.tiempo_traslado_horas
+            tot_t_estancia += m.tiempo_estancia_horas
+            tot_pts += m.puntaje_acumulado
+
+            lineas.append(
+                f"│ {van_id:<8} │ "
+                f"{m.num_sitios:>6} │ "
+                f"{m.distancia_total_km:>9.2f} km │ "
+                f"{m.tiempo_traslado_horas:>9.2f} h │ "
+                f"{m.tiempo_estancia_horas:>9.2f} h │ "
+                f"{m.tiempo_total_horas:>9.2f} h │ "
+                f"{m.puntaje_acumulado:>10} pts │"
             )
-            lineas.append(fila)
-        lineas.append(linea_simple)
 
-    # 4. KPIS GLOBALES Y FUNCIÓN OBJETIVO
-    lineas.append("MÉTRICAS GLOBALES DE LA FLOTA (KPIs):")
-    lineas.append(f"  * Total Atractivos Visitados : {resultado.total_sitios_visitados} / 45")
-    lineas.append(f"  * Satisfacción Total Acumulada: {resultado.satisfaccion_total_acumulada} puntos")
-    lineas.append(f"  * Distancia Total Recorrida   : {resultado.distancia_total_flota_km:.2f} km")
-    lineas.append(f"  * Jornada Máxima Empleada     : {formatear_tiempo(resultado.tiempo_maximo_van_horas)} de {CONFIG.jornada_maxima_horas:.0f}h max")
-    
-    total_no_visitados = len(resultado.sitios_no_visitados)
-    lineas.append(f"  * Atractivos No Visitados    : {total_no_visitados} sitios")
-    if total_no_visitados > 0:
+        lineas.append("├──────────┼────────┼─────────────┼─────────────┼─────────────┼─────────────┼──────────────┤")
+        max_t = resultado.tiempo_maximo_van_horas
+        lineas.append(
+            f"│ TOTAL    │ "
+            f"{tot_sitios:>6} │ "
+            f"{tot_dist:>9.2f} km │ "
+            f"{tot_t_traslado:>9.2f} h │ "
+            f"{tot_t_estancia:>9.2f} h │ "
+            f"{max_t:>7.2f} h max │ "
+            f"{tot_pts:>10} pts │"
+        )
+        lineas.append("└──────────┴────────┴─────────────┴─────────────┴─────────────┴─────────────┴──────────────┘")
+        lineas.append("─" * ancho)
+
+    # 5. Indicadores globales (KPIs)
+    total_catalogo = len(dataset) if dataset else 45
+    lineas.append("🎯 INDICADORES CLAVE DE RENDIMIENTO (KPIs):")
+    lineas.append(f"  • Cobertura de Atractivos : {resultado.total_sitios_visitados} / {total_catalogo} sitios")
+    lineas.append(f"  • Satisfacción Acumulada  : {resultado.satisfaccion_total_acumulada} puntos")
+    lineas.append(f"  • Distancia Total Flota   : {resultado.distancia_total_flota_km:.2f} km")
+    lineas.append(f"  • Cuello de Botella Flota : {formatear_tiempo(resultado.tiempo_maximo_van_horas)} (Límite: {CONFIG.jornada_maxima_horas:.0f}h)")
+
+    no_vis = len(resultado.sitios_no_visitados)
+    lineas.append(f"  • Atractivos Sin Visitar  : {no_vis} sitios")
+    if 0 < no_vis <= 20:
         lineas.append(f"    IDs: {resultado.sitios_no_visitados}")
-    
-    # 5. DETALLE DE RUTAS
-    if resultado.metricas_por_van:
-        lineas.append(linea_simple)
-        lineas.append("ITINERARIOS DETALLADOS POR VAN:")
-        for van_id, m in resultado.metricas_por_van.items():
-            if dataset:
-                nombres = []
-                for sid in m.secuencia_visitas:
-                    if dataset.existe_sitio(sid):
-                        nombres.append(f"{sid} ({dataset.obtener_sitio(sid).nombre})")
-                    else:
-                        nombres.append(f"{sid} (ID INVÁLIDO)")
-                secuencia_str = "Hotel -> " + " -> ".join(nombres) + " -> Hotel"
-            else:
-                secuencia_str = "0 -> " + " -> ".join(map(str, m.secuencia_visitas)) + " -> 0"
-            lineas.append(f"  * {van_id}: {secuencia_str}")
+    elif no_vis > 20:
+        lineas.append(f"    IDs (primeros 20): {resultado.sitios_no_visitados[:20]} ...")
+    lineas.append("─" * ancho)
 
-    lineas.append(linea_doble)
+    # 6. Diagnóstico de calidad algorítmica
+    if resultado.rendimiento:
+        diag = resultado.rendimiento
+        lineas.append("🧠 DIAGNÓSTICO ALGORÍTMICO:")
+        lineas.append(f"  • Nivel de Calidad        : [ {diag.nivel_calidad} ]")
+        lineas.append(f"  • Cobertura de Red        : {diag.porcentaje_cobertura_sitios:.1f}%")
+        lineas.append(f"  • Uso de Jornada Máxima   : {diag.porcentaje_uso_jornada_max:.1f}%")
+        lineas.append(f"  • Aprovechamiento Flota   : {diag.promedio_uso_jornada_flota:.1f}%")
+        if diag.observaciones:
+            lineas.append("  • Observaciones Técnicas  :")
+            for obs in diag.observaciones:
+                lineas.append(f"     ↳ {obs}")
+        lineas.append("─" * ancho)
+
+    # 7. Desglose detallado de itinerarios
+    if resultado.metricas_por_van:
+        lineas.append("🗺  ITINERARIOS DETALLADOS POR VEHÍCULO:")
+        for van_id, m in resultado.metricas_por_van.items():
+            lineas.append(f"\n  🚐 {van_id.upper()} ({m.num_sitios} paradas | {m.puntaje_acumulado} pts | {formatear_tiempo(m.tiempo_total_horas)}):")
+            
+            # Secuencia compacta de IDs
+            secuencia_ids = [CONFIG.hotel_id] + m.secuencia_visitas + [CONFIG.hotel_id]
+            lineas.append(f"     Ruta: " + " -> ".join(map(str, secuencia_ids)))
+            
+            # Detalle con nombres y puntajes individuales
+            if dataset:
+                lineas.append("     Paradas intermedias:")
+                for idx, sid in enumerate(m.secuencia_visitas, start=1):
+                    if dataset.existe_sitio(sid):
+                        sitio = dataset.obtener_sitio(sid)
+                        lineas.append(f"       {idx:02d}. [ID {sid:>2}] {sitio.nombre:<32} ({sitio.puntaje:>3} pts)")
+                    else:
+                        lineas.append(f"       {idx:02d}. [ID {sid:>2}] ID INVÁLIDO O INEXISTENTE")
+
+    lineas.append("\n" + "═" * ancho)
     return "\n".join(lineas)
 
 
 def generar_reporte_dict(resultado: ResultadoValidacion) -> Dict[str, Any]:
     """Convierte el resultado en un diccionario estructurado serializable a JSON."""
-    return {
+    reporte = {
         "es_factible": resultado.es_factible,
         "total_sitios_visitados": resultado.total_sitios_visitados,
         "satisfaccion_total_acumulada": resultado.satisfaccion_total_acumulada,
@@ -140,6 +185,17 @@ def generar_reporte_dict(resultado: ResultadoValidacion) -> Dict[str, Any]:
             for vid, m in resultado.metricas_por_van.items()
         }
     }
+
+    if resultado.rendimiento:
+        reporte["diagnostico"] = {
+            "nivel_calidad": resultado.rendimiento.nivel_calidad,
+            "porcentaje_cobertura_sitios": resultado.rendimiento.porcentaje_cobertura_sitios,
+            "porcentaje_uso_jornada_max": resultado.rendimiento.porcentaje_uso_jornada_max,
+            "promedio_uso_jornada_flota": resultado.rendimiento.promedio_uso_jornada_flota,
+            "observaciones": resultado.rendimiento.observaciones
+        }
+
+    return reporte
 
 
 def exportar_reporte_json(resultado: ResultadoValidacion, filepath: str, indent: int = 2) -> None:

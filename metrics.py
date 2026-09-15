@@ -135,7 +135,7 @@ def evaluar_diagnostico_rendimiento(
 
     # Clasificación de calidad algorítmica calibrada para estancia de 30 min (0.5 h)
     if total_sitios >= 34:
-        nivel = "EXCELENTE / COMPETITIVO"
+        nivel = "COMPETITIVO"
         observaciones.append(
             f"Alta cobertura de red ({total_sitios}/{total_catalogo} sitios, {pct_cobertura}%). "
             f"La solución opera cerca del techo óptimo físico del sistema (~36 sitios)."
@@ -147,7 +147,7 @@ def evaluar_diagnostico_rendimiento(
             f"Existe margen para incorporar más paradas o refinar el orden de traslados."
         )
     else:
-        nivel = "SUBÓPTIMO / DEFICIENTE"
+        nivel = "DEFICIENTE"
         observaciones.append(
             f"Baja cobertura de atractivos ({total_sitios}/{total_catalogo} sitios, {pct_cobertura}%). "
             f"El objetivo primario de la empresa es maximizar el número de visitas atendidas."
