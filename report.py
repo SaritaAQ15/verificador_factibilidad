@@ -63,7 +63,7 @@ def generar_reporte_consola(
 
     # 4. Tabla de métricas por van
     if resultado.metricas_por_van:
-        lineas.append("📊 DESGLOSE OPERACIONAL POR VEHÍCULO:\n")
+        lineas.append("DESGLOSE OPERACIONAL POR VEHÍCULO:\n")
         lineas.append("┌──────────┬────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┐")
         lineas.append("│ Van      │ Sitios │ Distancia   │ T. Traslado │ T. Estancia │ T. Total    │ Satisfacción │")
         lineas.append("├──────────┼────────┼─────────────┼─────────────┼─────────────┼─────────────┼──────────────┤")
@@ -107,7 +107,7 @@ def generar_reporte_consola(
 
     # 5. Indicadores globales (KPIs)
     total_catalogo = len(dataset) if dataset else 45
-    lineas.append("🎯 INDICADORES CLAVE DE RENDIMIENTO (KPIs):")
+    lineas.append("INDICADORES CLAVE DE RENDIMIENTO (KPIs):")
     lineas.append(f"  • Cobertura de Atractivos : {resultado.total_sitios_visitados} / {total_catalogo} sitios")
     lineas.append(f"  • Satisfacción Acumulada  : {resultado.satisfaccion_total_acumulada} puntos")
     lineas.append(f"  • Distancia Total Flota   : {resultado.distancia_total_flota_km:.2f} km")
@@ -124,7 +124,7 @@ def generar_reporte_consola(
     # 6. Diagnóstico de calidad algorítmica
     if resultado.rendimiento:
         diag = resultado.rendimiento
-        lineas.append("🧠 DIAGNÓSTICO ALGORÍTMICO:")
+        lineas.append("DIAGNÓSTICO ALGORÍTMICO:")
         lineas.append(f"  • Nivel de Calidad        : [ {diag.nivel_calidad} ]")
         lineas.append(f"  • Cobertura de Red        : {diag.porcentaje_cobertura_sitios:.1f}%")
         lineas.append(f"  • Uso de Jornada Máxima   : {diag.porcentaje_uso_jornada_max:.1f}%")
@@ -139,7 +139,7 @@ def generar_reporte_consola(
     if resultado.metricas_por_van:
         lineas.append("🗺  ITINERARIOS DETALLADOS POR VEHÍCULO:")
         for van_id, m in resultado.metricas_por_van.items():
-            lineas.append(f"\n  🚐 {van_id.upper()} ({m.num_sitios} paradas | {m.puntaje_acumulado} pts | {formatear_tiempo(m.tiempo_total_horas)}):")
+            lineas.append(f"\n   {van_id.upper()} ({m.num_sitios} paradas | {m.puntaje_acumulado} pts | {formatear_tiempo(m.tiempo_total_horas)}):")
             
             # Secuencia compacta de IDs
             secuencia_ids = [CONFIG.hotel_id] + m.secuencia_visitas + [CONFIG.hotel_id]
